@@ -108,6 +108,80 @@ class BibliographicEntityQueryHandler(QueryHandler):
         pass
 
 
+#Yixuan
+class BibliographicEntityUploadHandler(UploadHandler):     
+    def pushDataToDb(self, path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                js_data = json.load(f)
+            
+            rows = []
+            for item in js_data:
+                rows.append({
+                    "identifiers": " ".join(item.get("id", [])), 
+                    "title": item.get("title", ""),
+                    "author": "; ".join(item.get("author", [])),
+                    "publicationDate": item.get("pub_date", ""), 
+                    "venue": item.get("venue", "")
+                })
+    
+            df = pd.DataFrame(rows)
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            df.to_sql("BibliographicEntity", conn, if_exists="replace", index=False)
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Upload Error: {e}")
+            return False
+        
+
+
+class BibliographicEntityQueryHandler(QueryHandler):
+    def getById(self, id):
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            query = "SELECT * FROM BibliographicEntity WHERE identifiers LIKE ?"
+            df = pd.read_sql_query(query, conn, params=(f"%{id}%",))
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getAllBibliographicEntities(self):
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            df = pd.read_sql_query("SELECT * FROM BibliographicEntity", conn)
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+
+    def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+         
+            if start_date and end_date:
+                query = "SELECT * FROM BibliographicEntity WHERE publicationDate BETWEEN ? AND ?"
+                df = pd.read_sql_query(query, conn, params=(start_date, end_date))
+            elif start_date:
+                query = "SELECT * FROM BibliographicEntity WHERE publicationDate >= ?"
+                df = pd.read_sql_query(query, conn, params=(start_date,))
+            elif end_date:
+                query = "SELECT * FROM BibliographicEntity WHERE publicationDate <= ?"
+                df = pd.read_sql_query(query, conn, params=(end_date,))
+            else:
+                df = pd.read_sql_query("SELECT * FROM BibliographicEntity", conn)
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+
+#Ksenia
 class FullQueryEngine(BasicQueryEngine):
     def getAuthorSelfCitationsByName(self, author_name):
         result = []
