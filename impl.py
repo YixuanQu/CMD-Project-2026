@@ -1,3 +1,7 @@
+import json
+import sqlite3
+import pandas as pd
+
 # YIXUAN
 class IdentifiableEntity(object):
     def __init__(self, identifiers):
@@ -61,11 +65,51 @@ class BibliographicEntity(IdentifiableEntity):
     
     def getVenue(self):
         return self.venue
-    
-    
 
- 
-# SAYA 
+
+# POLYXENI
+class Handler(object):
+    def __init__(self):
+        self.dbPathOrUrl = ""
+    
+    def getDbPathOrUrl(self):
+        return self.dbPathOrUrl
+    
+    def setDbPathOrUrl(self, pathOrUrl):
+        self.dbPathOrUrl = pathOrUrl
+        return True
+
+class UploadHandler(Handler):
+    def pushDataToDb(self, path):
+        pass
+
+# YIXUAN
+class BibliographicEntityUploadHandler(UploadHandler):
+    def pushDataToDb(self, path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                js_data = json.load(f)
+            
+            rows = []
+            for item in js_data:
+                rows.append({
+                    "identifiers": " ".join(item.get("id", [])),
+                    "title": item.get("title", ""),
+                    "author": "; ".join(item.get("author", [])),
+                    "publicationDate": item.get("pub_date", ""),
+                    "venue": item.get("venue", "")
+                })
+            
+            df = pd.DataFrame(rows)
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            df.to_sql("BibliographicEntity", conn, if_exists="replace", index=False)
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Upload Error: {e}")
+            return False
+
+# SAYA
 class CitationUploadHandler(UploadHandler):
     def pushDataToDb(self, path):
         try:
@@ -107,48 +151,91 @@ class CitationUploadHandler(UploadHandler):
             print(e)
             return False
 
-
-
-
 # POLYXENI
-class Handler(object):
-    def __init__(self):
-        self.dbPathOrUrl = ""
-    
-    def getDbPathOrUrl(self):
-        return self.dbPathOrUrl
-    
-    def setDbPathOrUrl(self, pathOrUrl):
-        self.dbPathOrUrl = pathOrUrl
-        return True
-
-class UploadHandler(Handler):
-    def pushDataToDb(self, path):
-        pass
-
-class BibliographicEntityUploadHandler(UploadHandler):
-    def pushDataToDb(self, path):
-        pass
-
 class QueryHandler(Handler):
     def getById(self, id):
         pass
 
+# YIXUAN
 class BibliographicEntityQueryHandler(QueryHandler):
     def getById(self, id):
-        pass
-    def getAllBibliographicEntities(self):
-        pass
-    def getBibliographicEntitiesWithTitle(self, title):
-        pass
-    def getBibliographicEntitiesWithAuthor(self, author):
-        pass
-    def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
-        pass
-    def getBibliographicEntitiesWithVenue(self, venue):
-        pass
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            query = "SELECT * FROM BibliographicEntity WHERE identifiers LIKE ?"
+            df = pd.read_sql_query(query, conn, params=(f"%{id}%",))
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
 
-#SAYA
+    def getAllBibliographicEntities(self):
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            df = pd.read_sql_query("SELECT * FROM BibliographicEntity", conn)
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getBibliographicEntitiesWithTitle(self, title):
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            df = pd.read_sql_query(
+                "SELECT * FROM BibliographicEntity WHERE title LIKE ?",
+                conn, params=(f"%{title}%",))
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getBibliographicEntitiesWithAuthor(self, author):
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            df = pd.read_sql_query(
+                "SELECT * FROM BibliographicEntity WHERE author LIKE ?",
+                conn, params=(f"%{author}%",))
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            if start_date and end_date:
+                query = "SELECT * FROM BibliographicEntity WHERE publicationDate BETWEEN ? AND ?"
+                df = pd.read_sql_query(query, conn, params=(start_date, end_date))
+            elif start_date:
+                query = "SELECT * FROM BibliographicEntity WHERE publicationDate >= ?"
+                df = pd.read_sql_query(query, conn, params=(start_date,))
+            elif end_date:
+                query = "SELECT * FROM BibliographicEntity WHERE publicationDate <= ?"
+                df = pd.read_sql_query(query, conn, params=(end_date,))
+            else:
+                df = pd.read_sql_query("SELECT * FROM BibliographicEntity", conn)
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getBibliographicEntitiesWithVenue(self, venue):
+        try:
+            conn = sqlite3.connect(self.getDbPathOrUrl())
+            df = pd.read_sql_query(
+                "SELECT * FROM BibliographicEntity WHERE venue LIKE ?",
+                conn, params=(f"%{venue}%",))
+            conn.close()
+            return df
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+# SAYA
 class CitationQueryHandler(QueryHandler):
     def getById(self, id):
         try:
@@ -360,82 +447,66 @@ class CitationQueryHandler(QueryHandler):
             return pd.DataFrame()
 
 
-#Yixuan
-class BibliographicEntityUploadHandler(UploadHandler):     
-    def pushDataToDb(self, path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                js_data = json.load(f)
-            
-            rows = []
-            for item in js_data:
-                rows.append({
-                    "identifiers": " ".join(item.get("id", [])), 
-                    "title": item.get("title", ""),
-                    "author": "; ".join(item.get("author", [])),
-                    "publicationDate": item.get("pub_date", ""), 
-                    "venue": item.get("venue", "")
-                })
-    
-            df = pd.DataFrame(rows)
-            conn = sqlite3.connect(self.getDbPathOrUrl())
-            df.to_sql("BibliographicEntity", conn, if_exists="replace", index=False)
-            conn.close()
-            return True
-        except Exception as e:
-            print(f"Upload Error: {e}")
-            return False
-        
+# POLYXENI
+class BasicQueryEngine:
+    def __init__(self):
+        self.citationQuery = []
+        self.bibliographicEntityQuery = []
 
+    def cleanCitationHandlers(self):
+        self.citationQuery = []
+        return True
 
-class BibliographicEntityQueryHandler(QueryHandler):
-    def getById(self, id):
-        try:
-            conn = sqlite3.connect(self.getDbPathOrUrl())
-            query = "SELECT * FROM BibliographicEntity WHERE identifiers LIKE ?"
-            df = pd.read_sql_query(query, conn, params=(f"%{id}%",))
-            conn.close()
-            return df
-        except Exception as e:
-            print(e)
-            return pd.DataFrame()
+    def cleanBibliographicEntityHandlers(self):
+        self.bibliographicEntityQuery = []
+        return True
 
-    def getAllBibliographicEntities(self):
-        try:
-            conn = sqlite3.connect(self.getDbPathOrUrl())
-            df = pd.read_sql_query("SELECT * FROM BibliographicEntity", conn)
-            conn.close()
-            return df
-        except Exception as e:
-            print(e)
-            return pd.DataFrame()
+    def addCitationHandler(self, handler):
+        self.citationQuery.append(handler)
+        return True
 
+    def addBibliographicEntityHandler(self, handler):
+        self.bibliographicEntityQuery.append(handler)
+        return True
 
-    def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
-        try:
-            conn = sqlite3.connect(self.getDbPathOrUrl())
-         
-            if start_date and end_date:
-                query = "SELECT * FROM BibliographicEntity WHERE publicationDate BETWEEN ? AND ?"
-                df = pd.read_sql_query(query, conn, params=(start_date, end_date))
-            elif start_date:
-                query = "SELECT * FROM BibliographicEntity WHERE publicationDate >= ?"
-                df = pd.read_sql_query(query, conn, params=(start_date,))
-            elif end_date:
-                query = "SELECT * FROM BibliographicEntity WHERE publicationDate <= ?"
-                df = pd.read_sql_query(query, conn, params=(end_date,))
-            else:
-                df = pd.read_sql_query("SELECT * FROM BibliographicEntity", conn)
-            conn.close()
-            return df
-        except Exception as e:
-            print(e)
-            return pd.DataFrame()
+    def getEntityById(self, id):
+        for handler in self.citationQuery:
+            df = handler.getById(id)
+            if df is not None and len(df) > 0:
+                row = df.iloc[0]
+                citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                if row.get("author_sc") == "yes":
+                    return AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited)
+                elif row.get("journal_sc") == "yes":
+                    return JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited)
+                else:
+                    return Citation([row["oci"]], row["creation"], row["timespan"], citing, cited)
+        for handler in self.bibliographicEntityQuery:
+            df = handler.getById(id)
+            if df is not None and len(df) > 0:
+                row = df.iloc[0]
+                authors = row["author"].split("; ") if row["author"] else []
+                return BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"])
+        return None
 
+    def getAllCitations(self):
+        result = []
+        for handler in self.citationQuery:
+            df = handler.getAllCitations()
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                    if row.get("author_sc") == "yes":
+                        result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    elif row.get("journal_sc") == "yes":
+                        result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    else:
+                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
 
-#Ksenia
-class FullQueryEngine(BasicQueryEngine):
-    def getAuthorSelfCitationsByName(self, author_name):
+    def getAllAuthorSelfCitations(self):
         result = []
         for handler in self.citationQuery:
             df = handler.getAllAuthorSelfCitations()
@@ -446,7 +517,7 @@ class FullQueryEngine(BasicQueryEngine):
                     result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
         return result
 
-    def getJournalSelfCitationsByName(self, journal_name):
+    def getAllJournalSelfCitations(self):
         result = []
         for handler in self.citationQuery:
             df = handler.getAllJournalSelfCitations()
@@ -457,40 +528,90 @@ class FullQueryEngine(BasicQueryEngine):
                     result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
         return result
 
-    def getCitationsOfBibEntityByTitleWithinDate(self, title, min_date, max_date):
+    def getCitationsWithinTimespan(self, min_timespan, max_timespan):
         result = []
-        bib_entities = self.getBibliographicEntitiesWithTitle(title)
-        cited_ids = set()
-        for entity in bib_entities:
-            for id in entity.getIds():
-                cited_ids.add(id)
-        for handler in self.citationQuery:
-            df = handler.getCitationsWithinDate(min_date, max_date)
-            if df is not None and len(df) > 0:
-                for _, row in df.iterrows():
-                    if row["cited"] in cited_ids:
-                        citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                        cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-        return result
-
-    def getReferencesOfBibEntityByTitleWithinTimespan(self, title, min_timespan, max_timespan):
-        result = []
-        bib_entities = self.getBibliographicEntitiesWithTitle(title)
-        citing_ids = set()
-        for entity in bib_entities:
-            for id in entity.getIds():
-                citing_ids.add(id)
         for handler in self.citationQuery:
             df = handler.getCitationsWithinTimespan(min_timespan, max_timespan)
             if df is not None and len(df) > 0:
                 for _, row in df.iterrows():
-                    if row["citing"] in citing_ids:
-                        citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                        cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                    if row.get("author_sc") == "yes":
+                        result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    elif row.get("journal_sc") == "yes":
+                        result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    else:
                         result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
         return result
 
+    def getCitationsWithinDate(self, start_date, end_date):
+        result = []
+        for handler in self.citationQuery:
+            df = handler.getCitationsWithinDate(start_date, end_date)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                    if row.get("author_sc") == "yes":
+                        result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    elif row.get("journal_sc") == "yes":
+                        result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    else:
+                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
+
+    def getAllBibliographicEntities(self):
+        result = []
+        for handler in self.bibliographicEntityQuery:
+            df = handler.getAllBibliographicEntities()
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    authors = row["author"].split("; ") if row["author"] else []
+                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+        return result
+
+    def getBibliographicEntitiesWithTitle(self, title):
+        result = []
+        for handler in self.bibliographicEntityQuery:
+            df = handler.getBibliographicEntitiesWithTitle(title)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    authors = row["author"].split("; ") if row["author"] else []
+                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+        return result
+
+    def getBibliographicEntitiesWithAuthor(self, author):
+        result = []
+        for handler in self.bibliographicEntityQuery:
+            df = handler.getBibliographicEntitiesWithAuthor(author)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    authors = row["author"].split("; ") if row["author"] else []
+                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+        return result
+
+    def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
+        result = []
+        for handler in self.bibliographicEntityQuery:
+            df = handler.getBibliographicEntitiesWithinPublicationDate(start_date, end_date)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    authors = row["author"].split("; ") if row["author"] else []
+                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+        return result
+
+    def getBibliographicEntitiesWithVenue(self, venue):
+        result = []
+        for handler in self.bibliographicEntityQuery:
+            df = handler.getBibliographicEntitiesWithVenue(venue)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    authors = row["author"].split("; ") if row["author"] else []
+                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+        return result
+
+
+# KSENIA
 class FullQueryEngine(BasicQueryEngine):
     def getAuthorSelfCitationsByName(self, author_name):
         result = []
