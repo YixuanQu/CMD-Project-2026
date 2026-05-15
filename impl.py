@@ -84,22 +84,23 @@ class UploadHandler(Handler):
         pass
 
 # YIXUAN
+
 class BibliographicEntityUploadHandler(UploadHandler):
     def pushDataToDb(self, path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 js_data = json.load(f)
-            
+                
             rows = []
             for item in js_data:
                 rows.append({
-                    "identifiers": " ".join(item.get("id", [])),
+                    "id": " ".join(item.get("id", [])),
                     "title": item.get("title", ""),
                     "author": "; ".join(item.get("author", [])),
-                    "publicationDate": item.get("pub_date", ""),
-                    "venue": item.get("venue", "")
+                    "pub_date": item.get("pub_date", ""),
+                    "venue": item.get("venue", "") if item.get("venue") is not None else ""
                 })
-            
+                
             df = pd.DataFrame(rows)
             conn = sqlite3.connect(self.getDbPathOrUrl())
             df.to_sql("BibliographicEntity", conn, if_exists="replace", index=False)
@@ -482,12 +483,13 @@ class BasicQueryEngine:
                     return JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited)
                 else:
                     return Citation([row["oci"]], row["creation"], row["timespan"], citing, cited)
+
         for handler in self.bibliographicEntityQuery:
             df = handler.getById(id)
             if df is not None and len(df) > 0:
                 row = df.iloc[0]
                 authors = row["author"].split("; ") if row["author"] else []
-                return BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"])
+                return BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"])
         return None
 
     def getAllCitations(self):
@@ -567,7 +569,7 @@ class BasicQueryEngine:
             if df is not None and len(df) > 0:
                 for _, row in df.iterrows():
                     authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
         return result
 
     def getBibliographicEntitiesWithTitle(self, title):
@@ -577,7 +579,7 @@ class BasicQueryEngine:
             if df is not None and len(df) > 0:
                 for _, row in df.iterrows():
                     authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
         return result
 
     def getBibliographicEntitiesWithAuthor(self, author):
@@ -587,7 +589,7 @@ class BasicQueryEngine:
             if df is not None and len(df) > 0:
                 for _, row in df.iterrows():
                     authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
         return result
 
     def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
@@ -597,7 +599,7 @@ class BasicQueryEngine:
             if df is not None and len(df) > 0:
                 for _, row in df.iterrows():
                     authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
         return result
 
     def getBibliographicEntitiesWithVenue(self, venue):
@@ -607,11 +609,11 @@ class BasicQueryEngine:
             if df is not None and len(df) > 0:
                 for _, row in df.iterrows():
                     authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["identifiers"]], row["title"], authors, row["publicationDate"], row["venue"]))
+                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
         return result
 
 
-# KSENIA
+# POLYXENI
 class FullQueryEngine(BasicQueryEngine):
     def getAuthorSelfCitationsByName(self, author_name):
         result = []
