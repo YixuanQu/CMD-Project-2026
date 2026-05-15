@@ -1,3 +1,4 @@
+#YIXUAN CLASS
 class IdentifiableEntity(object):
     def __init__(self, identifiers):
         self.id = set()
@@ -61,6 +62,75 @@ class BibliographicEntity(IdentifiableEntity):
     
     def getVenue(self):
         return self.venue
+
+# POLYXENI CLASS
+class BasicQueryEngine:
+    def __init__(self):
+        self.citationQuery = []
+        self.bibliographicEntityQuery = []
+
+    def cleanCitationHandlers(self):
+        self.citationQuery = []
+        return True
+
+    def cleanBibliographicEntityHandlers(self):
+        self.bibliographicEntityQuery = []
+        return True
+
+    def addCitationHandler(self, handler):
+        self.citationQuery.append(handler)
+        return True
+
+    def addBibliographicEntityHandler(self, handler):
+        self.bibliographicEntityQuery.append(handler)
+        return True
+
+    def getEntityById(self, id):
+        return None
+
+    def getAllCitations(self):
+        return []
+
+    def getAllAuthorSelfCitations(self):
+        return []
+
+    def getAllJournalSelfCitations(self):
+        return []
+
+    def getCitationsWithinTimespan(self, min_timespan, max_timespan):
+        return []
+
+    def getCitationsWithinDate(self, start_date, end_date):
+        return []
+
+    def getAllBibliographicEntities(self):
+        return []
+
+    def getBibliographicEntitiesWithTitle(self, title):
+        return []
+
+    def getBibliographicEntitiesWithAuthor(self, author):
+        return []
+
+    def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
+        return []
+
+    def getBibliographicEntitiesWithVenue(self, venue):
+        return []
+
+
+class FullQueryEngine(BasicQueryEngine):
+    def getAuthorSelfCitationsByName(self, author_name):
+        return []
+
+    def getJournalSelfCitationsByName(self, journal_name):
+        return []
+
+    def getCitationsOfBibEntityByTitleWithinDate(self, title, min_date, max_date):
+        return []
+
+    def getReferencesOfBibEntityByTitleWithinTimespan(self, title, min_timespan, max_timespan):
+        return []
     
 
 
