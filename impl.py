@@ -1,3 +1,4 @@
+#YIXUAN CLASS
 class IdentifiableEntity(object):
     def __init__(self, identifiers):
         self.id = set()
@@ -37,7 +38,8 @@ class JournalSelfCitation(Citation):
 
 class AuthorSelfCitation(Citation):
     pass
-
+    
+#POLYXENI CLASS
 class BibliographicEntity(IdentifiableEntity):
     def __init__(self, identifiers, title, author, publicationDate, venue):
         super().__init__(identifiers)
