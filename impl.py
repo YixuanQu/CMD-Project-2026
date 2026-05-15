@@ -108,69 +108,116 @@ class BibliographicEntityQueryHandler(QueryHandler):
         pass
 
 
-class BasicQueryEngine:
-    def __init__(self):
-        self.citationQuery = []
-        self.bibliographicEntityQuery = []
+class FullQueryEngine(BasicQueryEngine):
+    def getAuthorSelfCitationsByName(self, author_name):
+        result = []
+        for handler in self.citationQuery:
+            df = handler.getAllAuthorSelfCitations()
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                    result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
 
-    def cleanCitationHandlers(self):
-        self.citationQuery = []
-        return True
+    def getJournalSelfCitationsByName(self, journal_name):
+        result = []
+        for handler in self.citationQuery:
+            df = handler.getAllJournalSelfCitations()
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                    result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
 
-    def cleanBibliographicEntityHandlers(self):
-        self.bibliographicEntityQuery = []
-        return True
+    def getCitationsOfBibEntityByTitleWithinDate(self, title, min_date, max_date):
+        result = []
+        bib_entities = self.getBibliographicEntitiesWithTitle(title)
+        cited_ids = set()
+        for entity in bib_entities:
+            for id in entity.getIds():
+                cited_ids.add(id)
+        for handler in self.citationQuery:
+            df = handler.getCitationsWithinDate(min_date, max_date)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    if row["cited"] in cited_ids:
+                        citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                        cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
 
-    def addCitationHandler(self, handler):
-        self.citationQuery.append(handler)
-        return True
-
-    def addBibliographicEntityHandler(self, handler):
-        self.bibliographicEntityQuery.append(handler)
-        return True
-
-    def getEntityById(self, id):
-        return None
-
-    def getAllCitations(self):
-        return []
-
-    def getAllAuthorSelfCitations(self):
-        return []
-
-    def getAllJournalSelfCitations(self):
-        return []
-
-    def getCitationsWithinTimespan(self, min_timespan, max_timespan):
-        return []
-
-    def getCitationsWithinDate(self, start_date, end_date):
-        return []
-
-    def getAllBibliographicEntities(self):
-        return []
-
-    def getBibliographicEntitiesWithTitle(self, title):
-        return []
-
-    def getBibliographicEntitiesWithAuthor(self, author):
-        return []
-
-    def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
-        return []
-
-    def getBibliographicEntitiesWithVenue(self, venue):
-        return []
+    def getReferencesOfBibEntityByTitleWithinTimespan(self, title, min_timespan, max_timespan):
+        result = []
+        bib_entities = self.getBibliographicEntitiesWithTitle(title)
+        citing_ids = set()
+        for entity in bib_entities:
+            for id in entity.getIds():
+                citing_ids.add(id)
+        for handler in self.citationQuery:
+            df = handler.getCitationsWithinTimespan(min_timespan, max_timespan)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    if row["citing"] in citing_ids:
+                        citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                        cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
 
 class FullQueryEngine(BasicQueryEngine):
     def getAuthorSelfCitationsByName(self, author_name):
-        return []
+        result = []
+        for handler in self.citationQuery:
+            df = handler.getAllAuthorSelfCitations()
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                    result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
 
     def getJournalSelfCitationsByName(self, journal_name):
-        return []
+        result = []
+        for handler in self.citationQuery:
+            df = handler.getAllJournalSelfCitations()
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                    result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
 
     def getCitationsOfBibEntityByTitleWithinDate(self, title, min_date, max_date):
-        return []
+        result = []
+        bib_entities = self.getBibliographicEntitiesWithTitle(title)
+        cited_ids = set()
+        for entity in bib_entities:
+            for id in entity.getIds():
+                cited_ids.add(id)
+        for handler in self.citationQuery:
+            df = handler.getCitationsWithinDate(min_date, max_date)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    if row["cited"] in cited_ids:
+                        citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                        cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
 
     def getReferencesOfBibEntityByTitleWithinTimespan(self, title, min_timespan, max_timespan):
-        return []
+        result = []
+        bib_entities = self.getBibliographicEntitiesWithTitle(title)
+        citing_ids = set()
+        for entity in bib_entities:
+            for id in entity.getIds():
+                citing_ids.add(id)
+        for handler in self.citationQuery:
+            df = handler.getCitationsWithinTimespan(min_timespan, max_timespan)
+            if df is not None and len(df) > 0:
+                for _, row in df.iterrows():
+                    if row["citing"] in citing_ids:
+                        citing = BibliographicEntity([row["citing"]], "", [], "", "")
+                        cited = BibliographicEntity([row["cited"]], "", [], "", "")
+                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+        return result
