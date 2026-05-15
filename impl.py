@@ -65,7 +65,48 @@ class BibliographicEntity(IdentifiableEntity):
     
 
  
-# SAYA - add your code here:
+# SAYA 
+class CitationUploadHandler(UploadHandler):
+    def pushDataToDb(self, path):
+        try:
+            from rdflib import Graph, URIRef, Literal
+            from rdflib.plugins.stores.sparqlstore import SPARQLUpdateStore
+            
+            df = pd.read_csv(path)
+            my_graph = Graph()
+            base_url = "https://comp-data.github.io/res/"
+            
+            has_citing_entity = URIRef(base_url + "hasCitingEntity")
+            has_cited_entity = URIRef(base_url + "hasCitedEntity")
+            creation_date = URIRef("https://schema.org/dateCreated")
+            timespan = URIRef(base_url + "timespan")
+            journal_self_citation = URIRef(base_url + "journalSelfCitation")
+            author_self_citation = URIRef(base_url + "authorSelfCitation")
+            
+            for idx, row in df.iterrows():
+                citation_uri = URIRef(base_url + row["oci"])
+                citing_url = URIRef(base_url + row["citing"])
+                cited_url = URIRef(base_url + row["cited"])
+                
+                my_graph.add((citation_uri, has_citing_entity, citing_url))
+                my_graph.add((citation_uri, has_cited_entity, cited_url))
+                my_graph.add((citation_uri, creation_date, Literal(row["creation"])))
+                my_graph.add((citation_uri, timespan, Literal(row["timespan"])))
+                my_graph.add((citation_uri, journal_self_citation, Literal(row["journal_sc"])))
+                my_graph.add((citation_uri, author_self_citation, Literal(row["author_sc"])))
+            
+            my_store = SPARQLUpdateStore()
+            endpoint = self.getDbPathOrUrl()
+            my_store.open((endpoint, endpoint))
+            for triple in my_graph.triples((None, None, None)):
+                my_store.add(triple)
+            my_store.close()
+            return True
+        
+        except Exception as e:
+            print(e)
+            return False
+
 
 
 
@@ -106,6 +147,217 @@ class BibliographicEntityQueryHandler(QueryHandler):
         pass
     def getBibliographicEntitiesWithVenue(self, venue):
         pass
+
+#SAYA
+class CitationQueryHandler(QueryHandler):
+    def getById(self, id):
+        try:
+            from SPARQLWrapper import SPARQLWrapper, JSON
+            sparql = SPARQLWrapper(self.getDbPathOrUrl())
+            base_url = "https://comp-data.github.io/res/"
+            sparql.setQuery(f"""
+                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
+                WHERE {{
+                    ?oci <{base_url}hasCitingEntity> ?citing .
+                    ?oci <{base_url}hasCitedEntity> ?cited .
+                    ?oci <https://schema.org/dateCreated> ?creation .
+                    ?oci <{base_url}timespan> ?timespan .
+                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
+                    ?oci <{base_url}authorSelfCitation> ?author_sc .
+                    FILTER(STR(?oci) = "{base_url}{id}")
+                }}
+            """)
+            sparql.setReturnFormat(JSON)
+            results = sparql.query().convert()
+            rows = []
+            for r in results["results"]["bindings"]:
+                rows.append({
+                    "oci": r["oci"]["value"].replace(base_url, ""),
+                    "citing": r["citing"]["value"].replace(base_url, ""),
+                    "cited": r["cited"]["value"].replace(base_url, ""),
+                    "creation": r["creation"]["value"],
+                    "timespan": r["timespan"]["value"],
+                    "journal_sc": r["journal_sc"]["value"],
+                    "author_sc": r["author_sc"]["value"]
+                })
+            return pd.DataFrame(rows)
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getAllCitations(self):
+        try:
+            from SPARQLWrapper import SPARQLWrapper, JSON
+            sparql = SPARQLWrapper(self.getDbPathOrUrl())
+            base_url = "https://comp-data.github.io/res/"
+            sparql.setQuery(f"""
+                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
+                WHERE {{
+                    ?oci <{base_url}hasCitingEntity> ?citing .
+                    ?oci <{base_url}hasCitedEntity> ?cited .
+                    ?oci <https://schema.org/dateCreated> ?creation .
+                    ?oci <{base_url}timespan> ?timespan .
+                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
+                    ?oci <{base_url}authorSelfCitation> ?author_sc .
+                }}
+            """)
+            sparql.setReturnFormat(JSON)
+            results = sparql.query().convert()
+            rows = []
+            for r in results["results"]["bindings"]:
+                rows.append({
+                    "oci": r["oci"]["value"].replace(base_url, ""),
+                    "citing": r["citing"]["value"].replace(base_url, ""),
+                    "cited": r["cited"]["value"].replace(base_url, ""),
+                    "creation": r["creation"]["value"],
+                    "timespan": r["timespan"]["value"],
+                    "journal_sc": r["journal_sc"]["value"],
+                    "author_sc": r["author_sc"]["value"]
+                })
+            return pd.DataFrame(rows)
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getAllAuthorSelfCitations(self):
+        try:
+            from SPARQLWrapper import SPARQLWrapper, JSON
+            sparql = SPARQLWrapper(self.getDbPathOrUrl())
+            base_url = "https://comp-data.github.io/res/"
+            sparql.setQuery(f"""
+                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
+                WHERE {{
+                    ?oci <{base_url}hasCitingEntity> ?citing .
+                    ?oci <{base_url}hasCitedEntity> ?cited .
+                    ?oci <https://schema.org/dateCreated> ?creation .
+                    ?oci <{base_url}timespan> ?timespan .
+                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
+                    ?oci <{base_url}authorSelfCitation> ?author_sc .
+                    FILTER(?author_sc = "yes")
+                }}
+            """)
+            sparql.setReturnFormat(JSON)
+            results = sparql.query().convert()
+            rows = []
+            for r in results["results"]["bindings"]:
+                rows.append({
+                    "oci": r["oci"]["value"].replace(base_url, ""),
+                    "citing": r["citing"]["value"].replace(base_url, ""),
+                    "cited": r["cited"]["value"].replace(base_url, ""),
+                    "creation": r["creation"]["value"],
+                    "timespan": r["timespan"]["value"],
+                    "journal_sc": r["journal_sc"]["value"],
+                    "author_sc": r["author_sc"]["value"]
+                })
+            return pd.DataFrame(rows)
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getAllJournalSelfCitations(self):
+        try:
+            from SPARQLWrapper import SPARQLWrapper, JSON
+            sparql = SPARQLWrapper(self.getDbPathOrUrl())
+            base_url = "https://comp-data.github.io/res/"
+            sparql.setQuery(f"""
+                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
+                WHERE {{
+                    ?oci <{base_url}hasCitingEntity> ?citing .
+                    ?oci <{base_url}hasCitedEntity> ?cited .
+                    ?oci <https://schema.org/dateCreated> ?creation .
+                    ?oci <{base_url}timespan> ?timespan .
+                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
+                    ?oci <{base_url}authorSelfCitation> ?author_sc .
+                    FILTER(?journal_sc = "yes")
+                }}
+            """)
+            sparql.setReturnFormat(JSON)
+            results = sparql.query().convert()
+            rows = []
+            for r in results["results"]["bindings"]:
+                rows.append({
+                    "oci": r["oci"]["value"].replace(base_url, ""),
+                    "citing": r["citing"]["value"].replace(base_url, ""),
+                    "cited": r["cited"]["value"].replace(base_url, ""),
+                    "creation": r["creation"]["value"],
+                    "timespan": r["timespan"]["value"],
+                    "journal_sc": r["journal_sc"]["value"],
+                    "author_sc": r["author_sc"]["value"]
+                })
+            return pd.DataFrame(rows)
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getCitationsWithinTimespan(self, min_timespan, max_timespan):
+        try:
+            from SPARQLWrapper import SPARQLWrapper, JSON
+            sparql = SPARQLWrapper(self.getDbPathOrUrl())
+            base_url = "https://comp-data.github.io/res/"
+            sparql.setQuery(f"""
+                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
+                WHERE {{
+                    ?oci <{base_url}hasCitingEntity> ?citing .
+                    ?oci <{base_url}hasCitedEntity> ?cited .
+                    ?oci <https://schema.org/dateCreated> ?creation .
+                    ?oci <{base_url}timespan> ?timespan .
+                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
+                    ?oci <{base_url}authorSelfCitation> ?author_sc .
+                    FILTER(?timespan >= "{min_timespan}" && ?timespan <= "{max_timespan}")
+                }}
+            """)
+            sparql.setReturnFormat(JSON)
+            results = sparql.query().convert()
+            rows = []
+            for r in results["results"]["bindings"]:
+                rows.append({
+                    "oci": r["oci"]["value"].replace(base_url, ""),
+                    "citing": r["citing"]["value"].replace(base_url, ""),
+                    "cited": r["cited"]["value"].replace(base_url, ""),
+                    "creation": r["creation"]["value"],
+                    "timespan": r["timespan"]["value"],
+                    "journal_sc": r["journal_sc"]["value"],
+                    "author_sc": r["author_sc"]["value"]
+                })
+            return pd.DataFrame(rows)
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
+
+    def getCitationsWithinDate(self, start_date, end_date):
+        try:
+            from SPARQLWrapper import SPARQLWrapper, JSON
+            sparql = SPARQLWrapper(self.getDbPathOrUrl())
+            base_url = "https://comp-data.github.io/res/"
+            sparql.setQuery(f"""
+                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
+                WHERE {{
+                    ?oci <{base_url}hasCitingEntity> ?citing .
+                    ?oci <{base_url}hasCitedEntity> ?cited .
+                    ?oci <https://schema.org/dateCreated> ?creation .
+                    ?oci <{base_url}timespan> ?timespan .
+                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
+                    ?oci <{base_url}authorSelfCitation> ?author_sc .
+                    FILTER(?creation >= "{start_date}" && ?creation <= "{end_date}")
+                }}
+            """)
+            sparql.setReturnFormat(JSON)
+            results = sparql.query().convert()
+            rows = []
+            for r in results["results"]["bindings"]:
+                rows.append({
+                    "oci": r["oci"]["value"].replace(base_url, ""),
+                    "citing": r["citing"]["value"].replace(base_url, ""),
+                    "cited": r["cited"]["value"].replace(base_url, ""),
+                    "creation": r["creation"]["value"],
+                    "timespan": r["timespan"]["value"],
+                    "journal_sc": r["journal_sc"]["value"],
+                    "author_sc": r["author_sc"]["value"]
+                })
+            return pd.DataFrame(rows)
+        except Exception as e:
+            print(e)
+            return pd.DataFrame()
 
 
 #Yixuan
