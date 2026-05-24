@@ -2,19 +2,22 @@ import json
 import sqlite3
 import pandas as pd
 
+
 # Data Model - Yixuan
+
 class IdentifiableEntity(object):
     def __init__(self, identifiers):
         self.id = set()
         for identifier in identifiers:
             self.id.add(identifier)
-    
+
     def getIds(self):
         result = []
         for identifier in self.id:
             result.append(identifier)
         result.sort()
         return result
+
 
 class Citation(IdentifiableEntity):
     def __init__(self, identifiers, creation, timespan, citingEntity, citedEntity):
@@ -26,21 +29,24 @@ class Citation(IdentifiableEntity):
 
     def getCreation(self):
         return self.creation
-    
+
     def getTimespan(self):
         return self.timespan
-    
+
     def getCitingEntity(self):
         return self.citingEntity
-    
+
     def getCitedEntity(self):
         return self.citedEntity
+
 
 class JournalSelfCitation(Citation):
     pass
 
+
 class AuthorSelfCitation(Citation):
     pass
+
 
 class BibliographicEntity(IdentifiableEntity):
     def __init__(self, identifiers, title, author, publicationDate, venue):
@@ -49,46 +55,48 @@ class BibliographicEntity(IdentifiableEntity):
         self.author = author
         self.publicationDate = str(publicationDate)
         self.venue = str(venue)
-    
+
     def getTitle(self):
         return self.title
-    
+
     def getAuthors(self):
         result = []
         for author in self.author:
             result.append(author)
         result.sort()
         return result
-    
+
     def getPublicationDate(self):
         return self.publicationDate
-    
+
     def getVenue(self):
         return self.venue
 
 
-# POLYXENI
+# Base Handlers - Polyxeni
 class Handler(object):
     def __init__(self):
         self.dbPathOrUrl = ""
-    
+
     def getDbPathOrUrl(self):
         return self.dbPathOrUrl
-    
+
     def setDbPathOrUrl(self, pathOrUrl):
         self.dbPathOrUrl = pathOrUrl
         return True
 
+
 class UploadHandler(Handler):
     def pushDataToDb(self, path):
         pass
+
 
 class QueryHandler(Handler):
     def getById(self, id):
         pass
 
 
-# Bibliographic Entity Upload Handler - Yixuan
+#  Bibliographic Entity Upload Handler -Yixuan
 
 class BibliographicEntityUploadHandler(UploadHandler):
     def pushDataToDb(self, path):
@@ -115,7 +123,9 @@ class BibliographicEntityUploadHandler(UploadHandler):
             print(f"Upload Error: {e}")
             return False
 
-# SAYA
+
+# Citation Upload Handler - Saya
+
 class CitationUploadHandler(UploadHandler):
     def pushDataToDb(self, path):
         try:
@@ -152,13 +162,14 @@ class CitationUploadHandler(UploadHandler):
                 my_store.add(triple)
             my_store.close()
             return True
-        
         except Exception as e:
-            print(e)
+            print(f"Graph Upload Error: {e}")
             return False
 
 
+
 # Bibliographic Entity Query Handler - Yixuan
+
 class BibliographicEntityQueryHandler(QueryHandler):
     def getById(self, id):
         try:
@@ -168,7 +179,6 @@ class BibliographicEntityQueryHandler(QueryHandler):
             conn.close()
             return df
         except Exception as e:
-            print(e)
             return pd.DataFrame()
 
     def getAllBibliographicEntities(self):
@@ -178,7 +188,6 @@ class BibliographicEntityQueryHandler(QueryHandler):
             conn.close()
             return df
         except Exception as e:
-            print(e)
             return pd.DataFrame()
 
     def getBibliographicEntitiesWithTitle(self, title):
@@ -190,7 +199,6 @@ class BibliographicEntityQueryHandler(QueryHandler):
             conn.close()
             return df
         except Exception as e:
-            print(e)
             return pd.DataFrame()
 
     def getBibliographicEntitiesWithAuthor(self, author):
@@ -202,7 +210,6 @@ class BibliographicEntityQueryHandler(QueryHandler):
             conn.close()
             return df
         except Exception as e:
-            print(e)
             return pd.DataFrame()
 
     def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
@@ -222,7 +229,6 @@ class BibliographicEntityQueryHandler(QueryHandler):
             conn.close()
             return df
         except Exception as e:
-            print(e)
             return pd.DataFrame()
 
     def getBibliographicEntitiesWithVenue(self, venue):
@@ -234,17 +240,20 @@ class BibliographicEntityQueryHandler(QueryHandler):
             conn.close()
             return df
         except Exception as e:
-            print(e)
             return pd.DataFrame()
 
-# SAYA
+
+
+# Citation Query Handler - Saya
+
 class CitationQueryHandler(QueryHandler):
-    def getById(self, id):
+    def _run_sparql(self, sparql_filter=""):
         try:
             from SPARQLWrapper import SPARQLWrapper, JSON
             sparql = SPARQLWrapper(self.getDbPathOrUrl())
             base_url = "https://comp-data.github.io/res/"
-            sparql.setQuery(f"""
+            
+            query = f"""
                 SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
                 WHERE {{
                     ?oci <{base_url}hasCitingEntity> ?citing .
@@ -253,11 +262,13 @@ class CitationQueryHandler(QueryHandler):
                     ?oci <{base_url}timespan> ?timespan .
                     ?oci <{base_url}journalSelfCitation> ?journal_sc .
                     ?oci <{base_url}authorSelfCitation> ?author_sc .
-                    FILTER(STR(?oci) = "{base_url}{id}")
+                    {sparql_filter}
                 }}
-            """)
+            """
+            sparql.setQuery(query)
             sparql.setReturnFormat(JSON)
             results = sparql.query().convert()
+            
             rows = []
             for r in results["results"]["bindings"]:
                 rows.append({
@@ -271,403 +282,229 @@ class CitationQueryHandler(QueryHandler):
                 })
             return pd.DataFrame(rows)
         except Exception as e:
-            print(e)
             return pd.DataFrame()
+
+    def getById(self, id):
+        base_url = "https://comp-data.github.io/res/"
+        return self._run_sparql(f'FILTER(STR(?oci) = "{base_url}{id}")')
 
     def getAllCitations(self):
-        try:
-            from SPARQLWrapper import SPARQLWrapper, JSON
-            sparql = SPARQLWrapper(self.getDbPathOrUrl())
-            base_url = "https://comp-data.github.io/res/"
-            sparql.setQuery(f"""
-                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
-                WHERE {{
-                    ?oci <{base_url}hasCitingEntity> ?citing .
-                    ?oci <{base_url}hasCitedEntity> ?cited .
-                    ?oci <https://schema.org/dateCreated> ?creation .
-                    ?oci <{base_url}timespan> ?timespan .
-                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
-                    ?oci <{base_url}authorSelfCitation> ?author_sc .
-                }}
-            """)
-            sparql.setReturnFormat(JSON)
-            results = sparql.query().convert()
-            rows = []
-            for r in results["results"]["bindings"]:
-                rows.append({
-                    "oci": r["oci"]["value"].replace(base_url, ""),
-                    "citing": r["citing"]["value"].replace(base_url, ""),
-                    "cited": r["cited"]["value"].replace(base_url, ""),
-                    "creation": r["creation"]["value"],
-                    "timespan": r["timespan"]["value"],
-                    "journal_sc": r["journal_sc"]["value"],
-                    "author_sc": r["author_sc"]["value"]
-                })
-            return pd.DataFrame(rows)
-        except Exception as e:
-            print(e)
-            return pd.DataFrame()
+        return self._run_sparql()
 
     def getAllAuthorSelfCitations(self):
-        try:
-            from SPARQLWrapper import SPARQLWrapper, JSON
-            sparql = SPARQLWrapper(self.getDbPathOrUrl())
-            base_url = "https://comp-data.github.io/res/"
-            sparql.setQuery(f"""
-                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
-                WHERE {{
-                    ?oci <{base_url}hasCitingEntity> ?citing .
-                    ?oci <{base_url}hasCitedEntity> ?cited .
-                    ?oci <https://schema.org/dateCreated> ?creation .
-                    ?oci <{base_url}timespan> ?timespan .
-                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
-                    ?oci <{base_url}authorSelfCitation> ?author_sc .
-                    FILTER(?author_sc = "yes")
-                }}
-            """)
-            sparql.setReturnFormat(JSON)
-            results = sparql.query().convert()
-            rows = []
-            for r in results["results"]["bindings"]:
-                rows.append({
-                    "oci": r["oci"]["value"].replace(base_url, ""),
-                    "citing": r["citing"]["value"].replace(base_url, ""),
-                    "cited": r["cited"]["value"].replace(base_url, ""),
-                    "creation": r["creation"]["value"],
-                    "timespan": r["timespan"]["value"],
-                    "journal_sc": r["journal_sc"]["value"],
-                    "author_sc": r["author_sc"]["value"]
-                })
-            return pd.DataFrame(rows)
-        except Exception as e:
-            print(e)
-            return pd.DataFrame()
+        return self._run_sparql('FILTER(?author_sc = "yes")')
 
     def getAllJournalSelfCitations(self):
-        try:
-            from SPARQLWrapper import SPARQLWrapper, JSON
-            sparql = SPARQLWrapper(self.getDbPathOrUrl())
-            base_url = "https://comp-data.github.io/res/"
-            sparql.setQuery(f"""
-                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
-                WHERE {{
-                    ?oci <{base_url}hasCitingEntity> ?citing .
-                    ?oci <{base_url}hasCitedEntity> ?cited .
-                    ?oci <https://schema.org/dateCreated> ?creation .
-                    ?oci <{base_url}timespan> ?timespan .
-                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
-                    ?oci <{base_url}authorSelfCitation> ?author_sc .
-                    FILTER(?journal_sc = "yes")
-                }}
-            """)
-            sparql.setReturnFormat(JSON)
-            results = sparql.query().convert()
-            rows = []
-            for r in results["results"]["bindings"]:
-                rows.append({
-                    "oci": r["oci"]["value"].replace(base_url, ""),
-                    "citing": r["citing"]["value"].replace(base_url, ""),
-                    "cited": r["cited"]["value"].replace(base_url, ""),
-                    "creation": r["creation"]["value"],
-                    "timespan": r["timespan"]["value"],
-                    "journal_sc": r["journal_sc"]["value"],
-                    "author_sc": r["author_sc"]["value"]
-                })
-            return pd.DataFrame(rows)
-        except Exception as e:
-            print(e)
-            return pd.DataFrame()
+        return self._run_sparql('FILTER(?journal_sc = "yes")')
 
     def getCitationsWithinTimespan(self, min_timespan, max_timespan):
-        try:
-            from SPARQLWrapper import SPARQLWrapper, JSON
-            sparql = SPARQLWrapper(self.getDbPathOrUrl())
-            base_url = "https://comp-data.github.io/res/"
-            sparql.setQuery(f"""
-                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
-                WHERE {{
-                    ?oci <{base_url}hasCitingEntity> ?citing .
-                    ?oci <{base_url}hasCitedEntity> ?cited .
-                    ?oci <https://schema.org/dateCreated> ?creation .
-                    ?oci <{base_url}timespan> ?timespan .
-                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
-                    ?oci <{base_url}authorSelfCitation> ?author_sc .
-                    FILTER(?timespan >= "{min_timespan}" && ?timespan <= "{max_timespan}")
-                }}
-            """)
-            sparql.setReturnFormat(JSON)
-            results = sparql.query().convert()
-            rows = []
-            for r in results["results"]["bindings"]:
-                rows.append({
-                    "oci": r["oci"]["value"].replace(base_url, ""),
-                    "citing": r["citing"]["value"].replace(base_url, ""),
-                    "cited": r["cited"]["value"].replace(base_url, ""),
-                    "creation": r["creation"]["value"],
-                    "timespan": r["timespan"]["value"],
-                    "journal_sc": r["journal_sc"]["value"],
-                    "author_sc": r["author_sc"]["value"]
-                })
-            return pd.DataFrame(rows)
-        except Exception as e:
-            print(e)
-            return pd.DataFrame()
+        return self._run_sparql(f'FILTER(?timespan >= "{min_timespan}" && ?timespan <= "{max_timespan}")')
 
     def getCitationsWithinDate(self, start_date, end_date):
-        try:
-            from SPARQLWrapper import SPARQLWrapper, JSON
-            sparql = SPARQLWrapper(self.getDbPathOrUrl())
-            base_url = "https://comp-data.github.io/res/"
-            sparql.setQuery(f"""
-                SELECT ?oci ?citing ?cited ?creation ?timespan ?journal_sc ?author_sc
-                WHERE {{
-                    ?oci <{base_url}hasCitingEntity> ?citing .
-                    ?oci <{base_url}hasCitedEntity> ?cited .
-                    ?oci <https://schema.org/dateCreated> ?creation .
-                    ?oci <{base_url}timespan> ?timespan .
-                    ?oci <{base_url}journalSelfCitation> ?journal_sc .
-                    ?oci <{base_url}authorSelfCitation> ?author_sc .
-                    FILTER(?creation >= "{start_date}" && ?creation <= "{end_date}")
-                }}
-            """)
-            sparql.setReturnFormat(JSON)
-            results = sparql.query().convert()
-            rows = []
-            for r in results["results"]["bindings"]:
-                rows.append({
-                    "oci": r["oci"]["value"].replace(base_url, ""),
-                    "citing": r["citing"]["value"].replace(base_url, ""),
-                    "cited": r["cited"]["value"].replace(base_url, ""),
-                    "creation": r["creation"]["value"],
-                    "timespan": r["timespan"]["value"],
-                    "journal_sc": r["journal_sc"]["value"],
-                    "author_sc": r["author_sc"]["value"]
-                })
-            return pd.DataFrame(rows)
-        except Exception as e:
-            print(e)
-            return pd.DataFrame()
+        return self._run_sparql(f'FILTER(?creation >= "{start_date}" && ?creation <= "{end_date}")')
 
 
-# POLYXENI
-class BasicQueryEngine:
+# Basic Query Engine - Polyxeni
+class BasicQueryEngine(object):
     def __init__(self):
         self.citationQuery = []
         self.bibliographicEntityQuery = []
-
+ 
     def cleanCitationHandlers(self):
         self.citationQuery = []
         return True
-
+ 
     def cleanBibliographicEntityHandlers(self):
         self.bibliographicEntityQuery = []
         return True
-
+ 
     def addCitationHandler(self, handler):
         self.citationQuery.append(handler)
         return True
-
+ 
     def addBibliographicEntityHandler(self, handler):
         self.bibliographicEntityQuery.append(handler)
         return True
-
+ 
     def getEntityById(self, id):
-        for handler in self.citationQuery:
-            df = handler.getById(id)
-            if df is not None and len(df) > 0:
-                row = df.iloc[0]
-                citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                if row.get("author_sc") == "yes":
-                    return AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited)
-                elif row.get("journal_sc") == "yes":
-                    return JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited)
-                else:
-                    return Citation([row["oci"]], row["creation"], row["timespan"], citing, cited)
-
         for handler in self.bibliographicEntityQuery:
             df = handler.getById(id)
-            if df is not None and len(df) > 0:
+            if df is not None and not df.empty:
                 row = df.iloc[0]
+                identifiers = row["id"].split(" ") if row["id"] else []
                 authors = row["author"].split("; ") if row["author"] else []
-                return BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"])
+                return BibliographicEntity(identifiers, row["title"], authors, row["pub_date"], row["venue"])
+ 
+        for handler in self.citationQuery:
+            df = handler.getById(id)
+            if df is not None and not df.empty:
+                row = df.iloc[0]
+                return self._build_citation_obj(row)
         return None
-
+ 
+    def _build_citation_obj(self, row, force_cls=None):
+        citing_entity = self.getEntityById(row["citing"])
+        cited_entity = self.getEntityById(row["cited"])
+ 
+        citing = citing_entity if citing_entity else BibliographicEntity([row["citing"]], "", [], "", "")
+        cited = cited_entity if cited_entity else BibliographicEntity([row["cited"]], "", [], "", "")
+ 
+        if force_cls:
+            return force_cls([row["oci"]], row["creation"], row["timespan"], citing, cited)
+        if str(row.get("author_sc")).lower() == "yes":
+            return AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited)
+        elif str(row.get("journal_sc")).lower() == "yes":
+            return JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited)
+        return Citation([row["oci"]], row["creation"], row["timespan"], citing, cited)
+ 
     def getAllCitations(self):
         result = []
         for handler in self.citationQuery:
             df = handler.getAllCitations()
-            if df is not None and len(df) > 0:
+            if df is not None and not df.empty:
                 for _, row in df.iterrows():
-                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                    if row.get("author_sc") == "yes":
-                        result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-                    elif row.get("journal_sc") == "yes":
-                        result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-                    else:
-                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    result.append(self._build_citation_obj(row))
         return result
-
+ 
     def getAllAuthorSelfCitations(self):
         result = []
         for handler in self.citationQuery:
             df = handler.getAllAuthorSelfCitations()
-            if df is not None and len(df) > 0:
+            if df is not None and not df.empty:
                 for _, row in df.iterrows():
-                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                    result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    result.append(self._build_citation_obj(row, force_cls=AuthorSelfCitation))
         return result
-
+ 
     def getAllJournalSelfCitations(self):
         result = []
         for handler in self.citationQuery:
             df = handler.getAllJournalSelfCitations()
-            if df is not None and len(df) > 0:
+            if df is not None and not df.empty:
                 for _, row in df.iterrows():
-                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                    result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    result.append(self._build_citation_obj(row, force_cls=JournalSelfCitation))
         return result
-
+ 
     def getCitationsWithinTimespan(self, min_timespan, max_timespan):
         result = []
         for handler in self.citationQuery:
             df = handler.getCitationsWithinTimespan(min_timespan, max_timespan)
-            if df is not None and len(df) > 0:
+            if df is not None and not df.empty:
                 for _, row in df.iterrows():
-                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                    if row.get("author_sc") == "yes":
-                        result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-                    elif row.get("journal_sc") == "yes":
-                        result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-                    else:
-                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    result.append(self._build_citation_obj(row))
         return result
-
+ 
     def getCitationsWithinDate(self, start_date, end_date):
         result = []
         for handler in self.citationQuery:
             df = handler.getCitationsWithinDate(start_date, end_date)
-            if df is not None and len(df) > 0:
+            if df is not None and not df.empty:
                 for _, row in df.iterrows():
-                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                    if row.get("author_sc") == "yes":
-                        result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-                    elif row.get("journal_sc") == "yes":
-                        result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-                    else:
-                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                    result.append(self._build_citation_obj(row))
         return result
-
+ 
+    def _convert_bib_df(self, df):
+        res = []
+        for _, row in df.iterrows():
+            identifiers = row["id"].split(" ") if row["id"] else []
+            authors = row["author"].split("; ") if row["author"] else []
+            res.append(BibliographicEntity(identifiers, row["title"], authors, row["pub_date"], row["venue"]))
+        return res
+ 
     def getAllBibliographicEntities(self):
         result = []
         for handler in self.bibliographicEntityQuery:
             df = handler.getAllBibliographicEntities()
-            if df is not None and len(df) > 0:
-                for _, row in df.iterrows():
-                    authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
+            if df is not None and not df.empty:
+                result.extend(self._convert_bib_df(df))
         return result
-
+ 
     def getBibliographicEntitiesWithTitle(self, title):
         result = []
         for handler in self.bibliographicEntityQuery:
             df = handler.getBibliographicEntitiesWithTitle(title)
-            if df is not None and len(df) > 0:
-                for _, row in df.iterrows():
-                    authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
+            if df is not None and not df.empty:
+                result.extend(self._convert_bib_df(df))
         return result
-
+ 
     def getBibliographicEntitiesWithAuthor(self, author):
         result = []
         for handler in self.bibliographicEntityQuery:
             df = handler.getBibliographicEntitiesWithAuthor(author)
-            if df is not None and len(df) > 0:
-                for _, row in df.iterrows():
-                    authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
+            if df is not None and not df.empty:
+                result.extend(self._convert_bib_df(df))
         return result
-
+ 
     def getBibliographicEntitiesWithinPublicationDate(self, start_date, end_date):
         result = []
         for handler in self.bibliographicEntityQuery:
             df = handler.getBibliographicEntitiesWithinPublicationDate(start_date, end_date)
-            if df is not None and len(df) > 0:
-                for _, row in df.iterrows():
-                    authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
+            if df is not None and not df.empty:
+                result.extend(self._convert_bib_df(df))
         return result
-
+ 
     def getBibliographicEntitiesWithVenue(self, venue):
         result = []
         for handler in self.bibliographicEntityQuery:
             df = handler.getBibliographicEntitiesWithVenue(venue)
-            if df is not None and len(df) > 0:
-                for _, row in df.iterrows():
-                    authors = row["author"].split("; ") if row["author"] else []
-                    result.append(BibliographicEntity([row["id"]], row["title"], authors, row["pub_date"], row["venue"]))
+            if df is not None and not df.empty:
+                result.extend(self._convert_bib_df(df))
         return result
-
-
-# POLYXENI
+ 
+ 
 class FullQueryEngine(BasicQueryEngine):
+ 
     def getAuthorSelfCitationsByName(self, author_name):
-        result = []
-        for handler in self.citationQuery:
-            df = handler.getAllAuthorSelfCitations()
-            if df is not None and len(df) > 0:
-                for _, row in df.iterrows():
-                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                    result.append(AuthorSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-        return result
-
+        all_scs = self.getAllAuthorSelfCitations()
+        filtered = []
+        for citation in all_scs:
+            combined_authors = [a.lower() for a in (
+                citation.getCitingEntity().getAuthors() +
+                citation.getCitedEntity().getAuthors()
+            )]
+            if author_name.lower() in combined_authors:
+                filtered.append(citation)
+        return filtered
+ 
     def getJournalSelfCitationsByName(self, journal_name):
-        result = []
-        for handler in self.citationQuery:
-            df = handler.getAllJournalSelfCitations()
-            if df is not None and len(df) > 0:
-                for _, row in df.iterrows():
-                    citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                    cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                    result.append(JournalSelfCitation([row["oci"]], row["creation"], row["timespan"], citing, cited))
-        return result
-
+        all_scs = self.getAllJournalSelfCitations()
+        filtered = []
+        for citation in all_scs:
+            venues = [
+                citation.getCitingEntity().getVenue().lower(),
+                citation.getCitedEntity().getVenue().lower()
+            ]
+            if journal_name.lower() in venues:
+                filtered.append(citation)
+        return filtered
+ 
     def getCitationsOfBibEntityByTitleWithinDate(self, title, min_date, max_date):
-        result = []
         bib_entities = self.getBibliographicEntitiesWithTitle(title)
         cited_ids = set()
         for entity in bib_entities:
-            for id in entity.getIds():
-                cited_ids.add(id)
+            for entity_id in entity.getIds():
+                cited_ids.add(entity_id)
+ 
+        result = []
         for handler in self.citationQuery:
             df = handler.getCitationsWithinDate(min_date, max_date)
-            if df is not None and len(df) > 0:
+            if df is not None and not df.empty:
                 for _, row in df.iterrows():
                     if row["cited"] in cited_ids:
-                        citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                        cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                        result.append(self._build_citation_obj(row))
         return result
-
+ 
     def getReferencesOfBibEntityByTitleWithinTimespan(self, title, min_timespan, max_timespan):
-        result = []
         bib_entities = self.getBibliographicEntitiesWithTitle(title)
         citing_ids = set()
         for entity in bib_entities:
-            for id in entity.getIds():
-                citing_ids.add(id)
+            for entity_id in entity.getIds():
+                citing_ids.add(entity_id)
+ 
+        result = []
         for handler in self.citationQuery:
             df = handler.getCitationsWithinTimespan(min_timespan, max_timespan)
-            if df is not None and len(df) > 0:
+            if df is not None and not df.empty:
                 for _, row in df.iterrows():
                     if row["citing"] in citing_ids:
-                        citing = BibliographicEntity([row["citing"]], "", [], "", "")
-                        cited = BibliographicEntity([row["cited"]], "", [], "", "")
-                        result.append(Citation([row["oci"]], row["creation"], row["timespan"], citing, cited))
+                        result.append(self._build_citation_obj(row))
         return result
