@@ -2,7 +2,7 @@ import json
 import sqlite3
 import pandas as pd
 
-# YIXUAN
+# Data Model - Yixuan
 class IdentifiableEntity(object):
     def __init__(self, identifiers):
         self.id = set()
@@ -19,8 +19,8 @@ class IdentifiableEntity(object):
 class Citation(IdentifiableEntity):
     def __init__(self, identifiers, creation, timespan, citingEntity, citedEntity):
         super().__init__(identifiers)
-        self.creation = creation
-        self.timespan = timespan
+        self.creation = str(creation)
+        self.timespan = str(timespan)
         self.citingEntity = citingEntity
         self.citedEntity = citedEntity
 
@@ -45,10 +45,10 @@ class AuthorSelfCitation(Citation):
 class BibliographicEntity(IdentifiableEntity):
     def __init__(self, identifiers, title, author, publicationDate, venue):
         super().__init__(identifiers)
-        self.title = title
+        self.title = str(title)
         self.author = author
-        self.publicationDate = publicationDate
-        self.venue = venue
+        self.publicationDate = str(publicationDate)
+        self.venue = str(venue)
     
     def getTitle(self):
         return self.title
@@ -83,7 +83,12 @@ class UploadHandler(Handler):
     def pushDataToDb(self, path):
         pass
 
-# YIXUAN
+class QueryHandler(Handler):
+    def getById(self, id):
+        pass
+
+
+# Bibliographic Entity Upload Handler - Yixuan
 
 class BibliographicEntityUploadHandler(UploadHandler):
     def pushDataToDb(self, path):
@@ -95,10 +100,10 @@ class BibliographicEntityUploadHandler(UploadHandler):
             for item in js_data:
                 rows.append({
                     "id": " ".join(item.get("id", [])),
-                    "title": item.get("title", ""),
+                    "title": item.get("title") or "",
                     "author": "; ".join(item.get("author", [])),
-                    "pub_date": item.get("pub_date", ""),
-                    "venue": item.get("venue", "") if item.get("venue") is not None else ""
+                    "pub_date": item.get("pub_date") or "",
+                    "venue": item.get("venue") or "" 
                 })
                 
             df = pd.DataFrame(rows)
@@ -152,17 +157,13 @@ class CitationUploadHandler(UploadHandler):
             print(e)
             return False
 
-# POLYXENI
-class QueryHandler(Handler):
-    def getById(self, id):
-        pass
 
-# YIXUAN
+# Bibliographic Entity Query Handler - Yixuan
 class BibliographicEntityQueryHandler(QueryHandler):
     def getById(self, id):
         try:
             conn = sqlite3.connect(self.getDbPathOrUrl())
-            query = "SELECT * FROM BibliographicEntity WHERE identifiers LIKE ?"
+            query = "SELECT * FROM BibliographicEntity WHERE id LIKE ?"
             df = pd.read_sql_query(query, conn, params=(f"%{id}%",))
             conn.close()
             return df
@@ -208,13 +209,13 @@ class BibliographicEntityQueryHandler(QueryHandler):
         try:
             conn = sqlite3.connect(self.getDbPathOrUrl())
             if start_date and end_date:
-                query = "SELECT * FROM BibliographicEntity WHERE publicationDate BETWEEN ? AND ?"
+                query = "SELECT * FROM BibliographicEntity WHERE pub_date BETWEEN ? AND ?"
                 df = pd.read_sql_query(query, conn, params=(start_date, end_date))
             elif start_date:
-                query = "SELECT * FROM BibliographicEntity WHERE publicationDate >= ?"
+                query = "SELECT * FROM BibliographicEntity WHERE pub_date >= ?"
                 df = pd.read_sql_query(query, conn, params=(start_date,))
             elif end_date:
-                query = "SELECT * FROM BibliographicEntity WHERE publicationDate <= ?"
+                query = "SELECT * FROM BibliographicEntity WHERE pub_date <= ?"
                 df = pd.read_sql_query(query, conn, params=(end_date,))
             else:
                 df = pd.read_sql_query("SELECT * FROM BibliographicEntity", conn)
